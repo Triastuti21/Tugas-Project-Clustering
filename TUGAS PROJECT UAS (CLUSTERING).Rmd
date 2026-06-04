@@ -1,0 +1,216 @@
+---
+title: "TUGAS PROJECT CLUSTERING"
+author: "Tri Astuti (3338240030)"
+date: "2026-06-03"
+output: rmdformats::readthedown
+---
+<style>
+body {
+text-align: justify;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. PREPARATION DATA OBESITY 
+
+```{r}
+# 1. Membaca Data Diabetes
+raw_data <- read.csv2("D:/KULIAH/SEMESTER 4/MATKUL/STAT MACHINE LEARNING/DATA OBESITAS.csv")
+
+# 2. Mengambil 200 baris pertama dan mengubah nama kolom menjadi x1 sampai x4
+data_sml <- data.frame(
+  x1 = as.numeric(raw_data[1:200, "Age"]),
+  x2 = as.numeric(raw_data[1:200, "Height"]),
+  x3 = as.numeric(raw_data[1:200, "Weight"]),
+  x4 = as.numeric(raw_data[1:200, "CH2O"])
+)
+
+# 3. MENAMPILKAN TABEL DATA INTERAKTIF DI RPUBS 
+library(DT)
+datatable(data_sml, caption = "Tabel 1: 200 Baris Pertama Data Obesitas dari 
+          Repositori UCI")
+```
+
+Studi kasus ini menggunakan data yang diambil dari UCI Machine Learning Repository,
+yaitu dataset "Estimation of Obesity Levels Based on Eating Habits and Physical
+Condition". Dataset ini berasal dari penelitian yang dilakukan oleh Polechor dan 
+de la Hoz (2019) di Meksiko, Peru, dan Kolombia. 
+Link sumber data sebagai berikut :https://archive.ics.uci.edu/dataset/544/estimation+of+obesity+levels+based+on+eating+habits+and+physical+condition
+
+Pada studi kasus ini digunakan 200 baris pertama dengan fokus pada 4 variabel 
+numerik, yaitu Age, Height, Weight, dan CH20. Pemilihan dataset ini dikarenakan 
+variabel fisik medis seperti Age(usia), Height(tinggi badan), Weight(berat badan), 
+dan CH20 memiliki skala satuan yang berbeda jauh. Hal ini ideal untuk digunakan 
+dalam berbagai algoritma clustering berbasis jarak.
+
+```{r}
+# Menjalankan PCA dengan kondisi DENGAN SCALING (scale. = TRUE)
+pca <- prcomp(data_sml, scale. = TRUE)
+summary(pca) 
+
+
+# Mengambil koordinat PC1 dan PC2 untuk keperluan plot grafik
+data_pca <- as.data.frame(pca$x[, 1:2])
+data_pca$Label <- paste0("P", 1:200)
+```
+
+Langka pertama yang dilakukan yaitu standarisasi (Scaling) dan reduksi dimensi 
+(PCA) agar hasil pengelompokkan menjadi objektif dan visualisasinya dapat dipetakan 
+dalam ruang 2 dimensi.
+
+# 2. PROSES CLUSTERING (K-MEANS & PAM)
+
+```{r}
+library(cluster)     
+library(ggplot2) 
+library(kmed)
+
+k_kluster <- 3
+```
+
+Selanjutnya menentukan K yang akan dipakai, pada studi kasus ini digunakan 
+K=3 untuk diterapkan pada K-means dan PAM. Penentuan K ini berdasarkan pada 
+karakteristik fungsional medis dari dataset Obesitas, di mana kondisi fisik manusia 
+dapat dikelompokkan menjadi 3, yaitu kelompok berat badan kurang/normal 
+(Underweight/Normal), kelompok berat badan berlebih (Overweight), dan 
+kelompok tingkat obesitas akut (Obese).  
+Selain itu penentuan k=3 juga menunjukkan bahwa penurunan varians data 
+mulai melandai secara konsisten setelah menyentuh kelompok yang ketiga. 
+
+## A. Metode K-Means
+
+```{r}
+# A. METODE K-MEANS
+#--------------------------------
+set.seed(123) # Agar hasil pengacakan K-Means konsisten
+km_res <- kmeans(data_pca[, 1:2], centers = k_kluster)
+data_pca$Cluster_KM <- as.factor(km_res$cluster)
+
+# Visualisasi Plot K-Means
+ggplot(data_pca, aes(x = PC1, y = PC2, col = Cluster_KM)) + 
+  geom_point(size = 3, alpha = 0.7) + 
+  theme_bw() + 
+  labs(title = "K-Means Clustering (PCA)", col = "Cluster")
+
+# Tabel Kontingensi Jumlah Anggota K-Means
+table(Cluster_KMeans = data_pca$Cluster_KM)
+```
+
+K-Means digunakan untuk membagi data secara tegas (hard clustering) ke 
+dalam sejumlah k kelompok dengan meminimalkan varians jarak antar setiap objek 
+data dengan pusat kluster terdekat. Berdasarkan output yang didapat, K-Means 
+dengan parameter k=3 berhasil membagi data ke dalam tiga kelompok, yaitu Cluster 
+1 sebanyak 116 pasien, Cluster 2 sebanyak 59 pasien, dan Cluster 3 sebanyak 25 
+pasien. Pada plot pembagian kluster ini ditandai dengan perbedaan warna tiap 
+Cluster.  
+Perbedaan jumlah anggota yang didapatkan tiap Cluster menunjukkan 
+karakteristik fisik dari sampel pasien tidak tersebar merata sehingga memiliki 
+kecenderungan terpusat pada kondisi fisik tertentu dan jumlahnya semakin menurun 
+ketika kondisi medis yang ekstrem. 
+
+## B. Metode PAM
+
+```{r}
+# B. METODE PAM (K-MEDOIDS) 
+#-----------------------------------
+set.seed(123)
+pam_res <- pam(data_pca[, 1:2], k = k_kluster)
+data_pca$Cluster_PAM <- as.factor(pam_res$clustering)
+
+# Visualisasi Plot PAM
+ggplot(data_pca, aes(x = PC1, y = PC2, col = Cluster_PAM)) + 
+  geom_point(size = 3, alpha = 0.7) + 
+  theme_bw() + 
+  labs(title = "PAM Clustering (PCA)", col = "Cluster")
+
+# Tabel Kontingensi Jumlah Anggota PAM
+table(Cluster_PAM = data_pca$Cluster_PAM)
+```
+
+Partitioning Around Medoids (PAM) merupakan metode klustering berbasis 
+medoid, PAM bekerja secara robust terhadap data pencilan dengan cara memilih 
+objek riil dari dataset pasien sebagai pusat kluster (medoid).  
+Berdasarkan output yang didapatkan, PAM membagi data ke dalam tiga 
+kelompok yang lebih merata dibandingkan dengan metode K-Means, yaitu Cluster 
+1 sebanyak 81 pasien, Cluster 2 sebanyak 51 pasien, dan Cluster 3 sebanyak 68 
+pasien. Pada plot pembagian kluster ini ditandai dengan perbedaan warna pada tiap 
+kluster, plot PAM membagi area ruang koordinat secara vertikal mengikuti sumbu 
+PC1.Secara visual, Cluster 1 menempati area paling kiri dalam koordinat PC1 
+negatif, kemudian Cluster 3 berada pada area transisi di bagian tengah, dan Cluster 
+2 berada pada area paling kanan dalam koordinat PC1 positif. Batas pemisahan 
+secara vertikal ini menunjukkan bahwa pendekatan objek medoid dapat memberikan 
+alternatif pengelompokan kondisi pasien yang terstruktur.
+
+# 3. TABEL KONTINGENSI & VALIDASI
+
+```{r}
+# 3. TABEL KONTINGENSI & VALIDASI 
+# ====================================================================
+
+# A. Cetak Tabel Kontingensi Perbandingan Anggota
+cat("\n--- Tabel Kontingensi: K-Means vs PAM ---\n")
+print(table(K_Means = data_pca$Cluster_KM, PAM = data_pca$Cluster_PAM))
+```
+
+Berdasarkan output tabel kontingensi yang didapat, yaitu pada Cluster 1 
+terdapat 81 pasien yang sama-sama dimasukkan ke dalam cluster 1 oleh K-Means 
+dan PAM. Hal ini menunjukkan bahwa terdapat 81 pasien memiliki karakteristik 
+klinis yang kuat dan konsisten, kemudian pada Cluster 2 terdapat 39 pasien yang 
+sama-sama masuk ke dalam Cluster 2 oleh kedua metode tersebut. Tetapi terdapat 
+12 pasien dalam metode PAM yang masuk ke Cluster 2, namun pada K-Means 
+masuk ke dalam Cluster 3, dan pada Cluster 3 hanya 13 pasien yang sejak awal sudah 
+disepakati oleh K-Means dan PAM untuk masuk ke dalam Cluster 3. 
+Kedua metode tersebut memiliki kecocokan yang searah pada pola diagonal 
+utamanya yaitu 81, 39, dan 13. Pergeseran lain terjadi karena K-Means mudah 
+bergeser (bias) akibat keberadaan outlier. Sedangkan metode PAM mempunyai 
+stabilitas yang tinggi karena penentuan pusatnya berdasarkan pada objek pasie riil 
+(medoid), sehingga tidak mudah dipengaruhi oleh data pencilan. 
+
+```{r}
+# B. Hitung Matriks Jarak Euclidean 
+dist_diabetes <- dist(data_sml)
+
+# C. Ekstrak Keanggotaan Cluster dan ID Medoid dari hasil PAM 
+clustmemb_pam <- pam_res$clustering
+clustmed_pam  <- pam_res$id.med
+
+# D. Validasi Silhouette PAM menggunakan Library kmed 
+library(kmed)
+silhouette_pam <- sil(dist_diabetes, clustmed_pam, clustmemb_pam)
+
+# E. Validasi Silhouette K-Means untuk pembanding menggunakan fungsi dasar R
+sil_km <- silhouette(km_res$cluster, dist_diabetes)
+
+# F. Menghitung Rata-rata Skor Akhir 
+avg_km <- mean(sil_km[, 3])
+avg_pam <- mean(silhouette_pam$result[, 1])
+
+# Cetak Hasil Skor Akhir 
+cat("\n--- HASIL VALIDASI SILHOUETTE WIDTH ---\n")
+cat("Rata-rata Silhouette K-Means : ", avg_km, "\n")
+cat("Rata-rata Silhouette PAM     : ", avg_pam, "\n\n")
+
+# G.Gambar Grafik Silhouette Plot 
+silhouette_pam$plot
+```
+
+Bedasarkan output validasi Silhouette didapatkan rata-rata silhouette K-Means 
+adalah 0,3003101 dan rata-rata silhouette PAM adalah 0,2951814. Hal ini 
+menunjukkan bahwa K-Means mempunyai tingkat kerapatan (compactness) yang 
+sedikit lebih baik. 
+Kemudian berdasarkan grafik Silhoutte yang didapat terlihat bahwa pada 
+Cluster 1 menunjukkan performa yang terbaik karena terdapat banyak nilai 
+silhouette bernilai positif tinggi. Sedangkan pada Cluster 2 dan Cluster 3 terdapat 
+nilai silhouette yang negative (mengarah ke bawah nilai 0), hal ini mengindikasikan 
+adanya beberapa objek pasien yang salam masuk Cluster atau terdapat objek yang 
+berada di area perbatasan yang tidak jelas. Hal ini wajar terjadi pada data klinis 
+obesitas, karena variasi tubuh pasien sering kali bersinggungan satu sama lain dan 
+tidak selalu terpisah secara mutlak. 
+Dalam data obesitas ini, metode PAM lebih direkomendasikan. Karena metode 
+K-Means lebih sensitif  terhadap data pencilan (outlier), yang berdampak pada 
+pembagian jumlah anggota Cluster yang timpang. Sedangkan metode PAM 
+menghasilkan struktur kelompok yang jauh lebih stabil, seimbang, dan realistis 
+secara medis karena pusat kelompoknya memakai data pasien riil (medoid).
